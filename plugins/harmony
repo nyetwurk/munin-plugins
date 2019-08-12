@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
-# sudo apt install python-urllib3
+# NOTE! requires `sudo apt install python-urllib3`
 
 #[harmony]
 #    env.addresses one1xxxxx one1yyyyy one1zzzz ... [required]
 #    env.wdir <directory of wallet.sh> [optional]
 #    env.abbrev <chars_of_addr> [optional]
 #    env.period <minute:hour:day> [optional]
-#    env.balance_warn <min> [optional, in ONE/sec]
-#    env.balance_crit <min> [optional, in ONE/sec]
+#    env.balance_warn <min> [optional, in ONE/hour]
+#    env.balance_crit <min> [optional, in ONE/hour]
 
 import os
 import sys
