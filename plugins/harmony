@@ -137,6 +137,7 @@ class HarmonyRewardPlugin(MuninPlugin):
                 info = "Harmony Rewards Rate",
                 # FIXME: expects in "per second" not "per hour"
                 # convert from per hour to per second
+                # https://github.com/munin-monitoring/munin/issues/1214
                 max = str(100/60/60),
                 min = str(0),
                 warning = str(round(warning/60/60, 4))+":",
