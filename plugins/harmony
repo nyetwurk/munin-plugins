@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+
+# sudo apt install python-urllib3
+
+#[harmony]
+#    env.addresses one1xxxxx one1yyyyy one1zzzz ... [required]
+#    env.wdir <directory of wallet.sh> [optional]
+#    env.abbrev <chars_of_addr> [optional]
+#    env.period <minute:hour:day> [optional]
+#    env.balance_warn <min> [optional, in ONE/sec]
+#    env.balance_crit <min> [optional, in ONE/sec]
+
+import os
+import sys
+
+from urllib3 import PoolManager
+from subprocess import Popen, PIPE
+
+class Account:
+    def __init__(self, address):
+        self.address = address
+        self.shard = 0
+        self.valid = False
+        self.label = self.init_label()
+
+    def init_label(self):
+        abbrev = int(os.environ.get('abbrev', 4))
+        r = PoolManager().request('GET', 'https://harmony.one/balances.csv')
+        for line in r.data.splitlines():
+            fields = line.decode().strip().split(',')
+            if (fields[0] == self.address):
+                self.shard = fields[1]
+                self.valid = (int(self.shard)>=0)
+                if (self.valid):
+                    return self.address[:abbrev+4] + '_' + self.shard
+                return self.address[:abbrev+4]
+
+    def get_balance(self):
+        wdir = os.environ.get('wdir', '/usr/local/harmony')
+        p = Popen(['sh', '-c', wdir + '/wallet.sh balances -address ' + self.address + ' | grep Balance'], cwd=wdir, stdout=PIPE)
+        with p.stdout:
+            b = 0
+            for line in iter(p.stdout.readline, b''):
+                fields = line.decode().split(':')
+                # field 1, column 0 (comma separated)
+                b += float(fields[1].strip().split(',')[0].strip())
+        return b
+
+class MuninPlugin(object):
+    title = ""
+    args = None
+    vlabel = None
+    info = None
+    category = None
+    fields = []
+
+    def __init__(self):
+        if 'GRAPH_TITLE' in os.environ:
+            self.title = os.environ['GRAPH_TITLE']
+        if 'GRAPH_CATEGORY' in os.environ:
+            self.category = os.environ['GRAPH_CATEGORY']
+        super(MuninPlugin, self).__init__()
+
+    def autoconf(self):
+        return False
+
+    def config(self):
+        conf = []
+        for k in ('title', 'category', 'args', 'vlabel', 'info', 'scale', 'order', 'period'):
+            v = getattr(self, k, None)
+            if v is not None:
+                if isinstance(v, bool):
+                    v = v and "yes" or "no"
+                elif isinstance(v, (tuple, list)):
+                    v = " ".join(v)
+                conf.append('graph_%s %s' % (k, v))
+
+        for field_name, field_args in self.fields:
+            for arg_name, arg_value in field_args.items():
+                conf.append('%s.%s %s' % (field_name, arg_name, arg_value))
+
+        print("\n".join(conf))
+
+    def suggest(self):
+        sys.exit(1)
+
+    def run(self):
+        cmd =  ((len(sys.argv) > 1) and sys.argv[1] or None) or "execute"
+        if cmd == "execute":
+            values = self.execute()
+            if values:
+                for k, v in values.items():
+                    print("%s.value %s" % (k, v))
+        elif cmd == "autoconf":
+            try:
+                ac = self.autoconf()
+            except Exception as exc:
+                print("no (%s)" % str(exc))
+                sys.exit(1)
+            if not ac:
+                print("no")
+                sys.exit(1)
+            print("yes")
+        elif cmd == "config":
+            self.config()
+        elif cmd == "suggest":
+            self.suggest()
+        sys.exit(0)
+   
+class HarmonyRewardPlugin(MuninPlugin):
+    title = "Harmony Reward Rate"
+    args = "--base 1000 -l 0"
+    scale = True
+    category = "other"
+    period = os.environ.get('period','hour')
+    vlabel = "ONE/" + period
+    accounts = []
+
+    def get_accounts(self):
+        addrs = os.environ.get('addresses','')
+        for a in addrs.split(' '):
+            if len(a)>0:
+                account = Account(a)
+                if (account.valid):
+                    self.accounts.append(account)
+
+    @property
+    def fields(self):
+        self.get_accounts()
+        warning = os.environ.get('balance_warn', 35)
+        critical = os.environ.get('balance_crit', 10)
+        ret = []
+                
+        for a in self.accounts:
+            ret.append([a.address, dict(
+                label = a.label,
+                info = "Harmony Rewards Rate",
+                # FIXME: expects in "per second" not "per hour"
+                # convert from per hour to per second
+                max = str(100/60/60),
+                min = str(0),
+                warning = str(round(warning/60/60, 4))+":",
+                critical = str(round(critical/60/60, 4))+":",
+                type = "DERIVE")])
+        return ret
+
+    def execute(self):
+        self.get_accounts()
+        ret = dict()
+        for a in self.accounts:
+           bal = a.get_balance()
+           if (bal>0):
+               ret[a.address] = round(a.get_balance())
+        return ret
+
+if __name__ == "__main__":
+    HarmonyRewardPlugin().run()
+
+# vim: sw=4 expandtab:
