@@ -33,7 +33,8 @@ class Account:
                 self.valid = (int(self.shard)>=0)
                 if (self.valid):
                     return self.address[:abbrev+4] + '_' + self.shard
-                return self.address[:abbrev+4]
+        self.valid = True
+        return self.address[:abbrev+4]
 
     def get_balance(self):
         wdir = os.environ.get('wdir', '/usr/local/harmony')
