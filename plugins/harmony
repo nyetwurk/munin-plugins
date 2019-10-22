@@ -4,6 +4,7 @@
 
 #[harmony]
 #    env.addresses one1xxxxx one1yyyyy one1zzzz ... [required]
+#    env.rpchost <url> [optional]
 #    env.wdir <directory of wallet.sh> [optional]
 #    env.abbrev <chars_of_addr> [optional]
 #    env.period <minute:hour:day> [optional]
@@ -12,6 +13,7 @@
 
 import os
 import sys
+import json
 
 from urllib3 import PoolManager
 from subprocess import Popen, PIPE
@@ -38,14 +40,26 @@ class Account:
 
     def get_balance(self):
         wdir = os.environ.get('wdir', '/usr/local/harmony')
-        p = Popen(['sh', '-c', wdir + '/wallet.sh balances -address ' + self.address + ' | grep Balance'], cwd=wdir, stdout=PIPE)
-        with p.stdout:
-            b = 0
-            for line in iter(p.stdout.readline, b''):
-                fields = line.decode().split(':')
-                # field 1, column 0 (comma separated)
-                b += float(fields[1].strip().split(',')[0].strip())
-        return b
+        if False:
+            p = Popen(['sh', '-c', wdir + '/wallet.sh balances -address ' + self.address + ' | grep Balance'], cwd=wdir, stdout=PIPE)
+            with p.stdout:
+                ret = 0
+                for line in iter(p.stdout.readline, b''):
+                    fields = line.decode().split(':')
+                    # field 1, column 0 (comma separated)
+                    ret += float(fields[1].strip().split(',')[0].strip())
+        else:
+            host = os.environ.get('rpchost', 'http://s0.t.hmny.io:9500')
+            while True:
+                p = Popen([wdir + '/hmy.sh', 'balance', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
+                out = p.communicate()[0]
+                if p.returncode == 0:
+                    break
+            for shard in json.loads(out.decode('utf-8')):
+                if shard['amount'] > 0:
+                    ret = shard['amount']
+                    break
+        return ret
 
 class MuninPlugin(object):
     title = ""
