@@ -168,8 +168,10 @@ class HarmonyRewardPlugin(MuninPlugin):
         for a in self.accounts:
            bal = a.get_balance()
            if (bal>0):
-               #ret[a.address] = round(a.get_balance())
-               ret[a.address] = a.get_balance()
+               # rrd does not support DERIVE on floats
+               # FIXME: make a mONE version?
+               #ret[a.address] = a.get_balance()
+               ret[a.address] = round(a.get_balance())
         return ret
 
 if __name__ == "__main__":
