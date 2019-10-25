@@ -50,9 +50,12 @@ class Account:
                     # field 1, column 0 (comma separated)
                     ret += float(fields[1].strip().split(',')[0].strip())
         else:
-            host = os.environ.get('rpchost', 'http://s0.t.hmny.io:9500')
             retries = os.environ.get('retries', 3)
-            for _ in range(retries):
+            for i in range(retries):
+                # rotate through 1 2 3 0. Start with 1, 0 is unstable
+                default = 'http://s' + str((i+1)%4) + '.t.hmny.io:9500'
+                host = os.environ.get('rpchost', default)
+                # print(host, self.address)
                 p = Popen([wdir + '/hmy.sh', 'balance', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
                 out = p.communicate()[0]
                 if p.returncode == 0:
@@ -170,8 +173,8 @@ class HarmonyRewardPlugin(MuninPlugin):
            if (bal>0):
                # rrd does not support DERIVE on floats
                # FIXME: make a mONE version?
-               #ret[a.address] = a.get_balance()
-               ret[a.address] = round(a.get_balance())
+               #ret[a.address] = bal
+               ret[a.address] = round(bal)
         return ret
 
 if __name__ == "__main__":
