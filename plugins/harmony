@@ -28,7 +28,7 @@ class Account:
 
     def init_label(self):
         abbrev = int(os.environ.get('abbrev', 4))
-        r = PoolManager().request('GET', 'https://harmony.one/balances.csv')
+        r = PoolManager().request('GET', 'https://harmony.one/1h.csv')
         for line in r.data.splitlines():
             fields = line.decode().strip().split(',')
             if (fields[0] == self.address):
