@@ -57,7 +57,7 @@ class Account:
             default = 'http://s' + str((i+1)%4) + '.t.hmny.io:9500'
             host = os.environ.get('rpchost', default)
             # print(host, self.address)
-            p = Popen([wdir + '/hmy.sh', 'balance', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
+            p = Popen([wdir + '/hmy.sh', 'balances', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
             out = p.communicate()[0]
             if p.returncode == 0:
                 break
