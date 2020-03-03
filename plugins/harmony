@@ -42,29 +42,34 @@ class Account:
     def get_balance(self):
         wdir = os.environ.get('wdir', '/usr/local/harmony')
         if False:
+            ret = 0
             p = Popen(['sh', '-c', wdir + '/wallet.sh balances -address ' + self.address + ' | grep Balance'], cwd=wdir, stdout=PIPE)
             with p.stdout:
-                ret = 0
                 for line in iter(p.stdout.readline, b''):
                     fields = line.decode().split(':')
                     # field 1, column 0 (comma separated)
                     ret += float(fields[1].strip().split(',')[0].strip())
-        else:
-            retries = os.environ.get('retries', 3)
-            for i in range(retries):
-                # rotate through 1 2 3 0. Start with 1, 0 is unstable
-                default = 'http://s' + str((i+1)%4) + '.t.hmny.io:9500'
-                host = os.environ.get('rpchost', default)
-                # print(host, self.address)
-                p = Popen([wdir + '/hmy.sh', 'balance', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
-                out = p.communicate()[0]
-                if p.returncode == 0:
-                    break
-            for shard in json.loads(out.decode('utf-8')):
-                if shard['amount'] > 0:
-                    ret = shard['amount']
-                    break
-        return ret
+            return ret
+
+        retries = os.environ.get('retries', 3)
+        for i in range(retries):
+            # rotate through 1 2 3 0. Start with 1, 0 is unstable
+            default = 'http://s' + str((i+1)%4) + '.t.hmny.io:9500'
+            host = os.environ.get('rpchost', default)
+            # print(host, self.address)
+            p = Popen([wdir + '/hmy.sh', 'balance', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
+            out = p.communicate()[0]
+            if p.returncode == 0:
+                break
+        try:
+            resp = json.loads(out.decode('utf-8'))
+            for shard in resp:
+                if 'amount' in shard and shard['amount'] > 0:
+                    return shard['amount']
+        except:
+            pass
+
+        return 0
 
 class MuninPlugin(object):
     title = ""
@@ -170,7 +175,7 @@ class HarmonyRewardPlugin(MuninPlugin):
         ret = dict()
         for a in self.accounts:
            bal = a.get_balance()
-           if (bal>0):
+           if bal>0:
                # rrd does not support DERIVE on floats
                # FIXME: make a mONE version?
                #ret[a.address] = bal
