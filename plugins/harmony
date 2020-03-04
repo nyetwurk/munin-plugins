@@ -15,8 +15,8 @@
 import os
 import sys
 import json
+import requests
 
-from urllib3 import PoolManager
 from subprocess import Popen, PIPE
 
 class Account:
@@ -28,14 +28,14 @@ class Account:
 
     def init_label(self):
         abbrev = int(os.environ.get('abbrev', 4))
-        r = PoolManager().request('GET', 'https://harmony.one/1h.csv')
-        for line in r.data.splitlines():
+        r = requests.get('https://harmony.one/1h.csv').content
+        for line in r.splitlines():
             fields = line.decode().strip().split(',')
-            if (fields[0] == self.address):
+            if fields[0] == self.address:
                 self.shard = fields[1]
                 self.valid = (int(self.shard)>=0)
                 if (self.valid):
-                    return self.address[:abbrev+4] + '_' + self.shard
+                    return f"{self.address[:abbrev+4]}_{self.shard}"
         self.valid = True
         return self.address[:abbrev+4]
 
@@ -43,8 +43,7 @@ class Account:
         wdir = os.environ.get('wdir', '/usr/local/harmony')
         if False:
             ret = 0
-            p = Popen(['sh', '-c', wdir + '/wallet.sh balances -address ' + self.address + ' | grep Balance'], cwd=wdir, stdout=PIPE)
-            with p.stdout:
+            with Popen(['sh', '-c', f"{wdir}/wallet.sh balances -address {self.address} | grep Balance"], cwd=wdir, stdout=PIPE) as p:
                 for line in iter(p.stdout.readline, b''):
                     fields = line.decode().split(':')
                     # field 1, column 0 (comma separated)
@@ -54,24 +53,23 @@ class Account:
         retries = os.environ.get('retries', 3)
         for i in range(retries):
             # rotate through 1 2 3 0. Start with 1, 0 is unstable
-            default = 'http://s' + str((i+1)%4) + '.t.hmny.io:9500'
+            default = f"http://s{str((i+1)%4)}.t.hmny.io:9500"
             host = os.environ.get('rpchost', default)
             # print(host, self.address)
-            p = Popen([wdir + '/hmy.sh', 'balances', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE)
-            out = p.communicate()[0]
-            if p.returncode == 0:
-                break
-        try:
-            resp = json.loads(out.decode('utf-8'))
-            for shard in resp:
-                if 'amount' in shard and shard['amount'] > 0:
-                    return shard['amount']
-        except:
-            pass
+            with Popen([f"{wdir}/hmy.sh", 'balances', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE) as p:
+                out = p.communicate()[0]
+                if p.returncode == 0:
+                    try:
+                        resp = json.loads(out.decode('utf-8'))
+                        for shard in resp:
+                            if 'amount' in shard and shard['amount'] > 0:
+                                return shard['amount']
+                    except:
+                        pass
 
         return 0
 
-class MuninPlugin(object):
+class MuninPlugin():
     title = ""
     args = None
     vlabel = None
@@ -138,7 +136,7 @@ class HarmonyRewardPlugin(MuninPlugin):
     scale = True
     category = "other"
     period = os.environ.get('period','hour')
-    vlabel = "ONE/" + period
+    vlabel = f"ONE/{period}"
     accounts = []
 
     def get_accounts(self):
