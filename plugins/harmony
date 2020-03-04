@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
-# NOTE! requires `sudo apt install python-urllib3`
-
 #[harmony]
 #    env.addresses one1xxxxx one1yyyyy one1zzzz ... [required]
 #    env.rpchost <url> [optional]
 #    env.retries <number> [optional]
 #    env.wdir <directory of wallet.sh> [optional]
+#    env.use_wallet <bool> [optional, to use legacy wallet client rather than hmy]
 #    env.abbrev <chars_of_addr> [optional]
 #    env.period <minute:hour:day> [optional]
 #    env.balance_warn <min> [optional, in ONE/hour]
@@ -41,7 +40,9 @@ class Account:
 
     def get_balance(self):
         wdir = os.environ.get('wdir', '/usr/local/harmony')
-        if False:
+
+        if os.environ.get('use_wallet', 'false').lower() in ["true", "yes", "y", "1"]:
+            # use legacy wallet
             ret = 0
             with Popen(['sh', '-c', f"{wdir}/wallet.sh balances -address {self.address} | grep Balance"], cwd=wdir, stdout=PIPE) as p:
                 for line in iter(p.stdout.readline, b''):
