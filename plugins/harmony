@@ -54,7 +54,7 @@ class Account:
         retries = os.environ.get('retries', 3)
         for i in range(retries):
             # rotate through 1 2 3 0. Start with 1, 0 is unstable
-            default = f"http://s{str((i+1)%4)}.t.hmny.io:9500"
+            default = f"https://api.s{str((i+1)%4)}.t.hmny.io/"
             host = os.environ.get('rpchost', default)
             # print(host, self.address)
             with Popen([f"{wdir}/hmy.sh", 'balances', '-n', host, self.address], cwd=wdir, stdout=PIPE, stderr=PIPE) as p:
