@@ -1,0 +1,82 @@
+#!/bin/sh
+# -*- sh -*-
+#
+# This plugin is based on the if_ plugin.
+#
+# Parameters
+#     None
+#
+# Magic markers (optional - used by munin-config and some installation
+# scripts):
+#
+#%# family=auto
+#%# capabilities=autoconf suggest
+
+
+DEVICE=${0##*/tc_}
+
+mytc() {
+	/sbin/tc -s class show dev "$1" | tr "\n" "|" | sed -e "s/ \+/ /g; s/ |/|/g; s/| /|/g; s/||/\n/g; s/|/ /g" | tr ":" "_" | grep -v -i sfq | sort -n
+}
+
+case "$1" in
+    autoconf)
+	if [ -r /proc/net/dev ]; then
+	    echo yes
+	    exit 0
+	else
+	    echo "no (/proc/net/dev not found)"
+	    exit 1
+	fi
+	;;
+    suggest)
+	if [ -r /proc/net/dev ]; then
+	    awk '
+                /^ *(eth|tap|bond|wlan|ath|ra|sw)[0-9]+:/ {
+                   split($0, a, /: */);
+                   gsub(/^ +/,"",a[1]);
+                   if (($2 > 0) || ($10 > 0)) print a[1]; }' /proc/net/dev
+	fi
+	exit 0
+	;;
+    config)
+	echo "graph_order $(mytc "$DEVICE" | awk '{ print $2 "_" $3 }' | tr "\n" " ")"
+	echo "graph_title $DEVICE TC traffic"
+	echo 'graph_args --base 1000'
+	echo 'graph_vlabel bits per ${graph_period}'
+	echo 'graph_category network'
+	echo "graph_info This graph shows the TC classes traffic of the $DEVICE network interface. Please note that the traffic is shown in bits per second, not bytes."
+
+	# the root(s)
+	mytc "$DEVICE" | grep -v " parent " | tr "_" " " | awk '{
+	    print $2 "_" $3 "_" $4 ".label " $2 "/" $3 ":" $4;
+	    print $2 "_" $3 "_" $4 ".type DERIVE";
+	    print $2 "_" $3 "_" $4 ".min 0";
+	    print $2 "_" $3 "_" $4 ".cdef " $2 "_" $3 "_" $4 ",8,*";
+	}'
+	# TODO: only AREASTACK things with no children
+	# the child(s)
+	mytc "$DEVICE" | grep " parent " | tr "_" " " | awk '{
+	    print $2 "_" $3 "_" $4 ".label " $2 "/" $3 ":" $4;
+	    print $2 "_" $3 "_" $4 ".type DERIVE";
+	    print $2 "_" $3 "_" $4 ".min 0";
+	    print $2 "_" $3 "_" $4 ".cdef " $2 "_" $3 "_" $4 ",8,*";
+	    print $2 "_" $3 "_" $4 ".draw AREASTACK";
+	 }'
+        exit 0
+	;;
+esac
+
+# the root(s)
+mytc "$DEVICE" | grep -v " parent " | awk '{
+    split(substr($0, match($0, /[0-9]+ [Bb]ytes/)), a, " ");
+    print $2 "_" $3 ".value " a[1];
+}'
+
+# the child(s)
+mytc "$DEVICE" | grep " parent " | awk '{
+    split(substr($0, match($0, /[0-9]+ [Bb]ytes/)), a, " ");
+    print $2 "_" $3 ".value " a[1];
+}'
+
+exit 0

@@ -49,8 +49,7 @@ dotrace() {
 
 [ "$1" = "config" ] && args="-c 1"
 [ "$1" = "config" ] || args="-n"
-
-LC_ALL=C mtr -r -i 0.2 $args $count $totrace | grep -v "^Start:" | grep -v "^HOST:" | LC_ALL=C  awk -v C=$1 ' {
+LC_ALL=C mtr -r -i .2 $count $totrace | grep -v "^HOST:" | LC_ALL=C  awk -v C=$1 ' {
 
 label=$2
 x=gsub("\\.","_",label)
