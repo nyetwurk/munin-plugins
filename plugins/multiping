@@ -11,15 +11,19 @@ multiping - Plugin to monitor ping times against several hosts
 
 The following environment variables are used
 
- ping_args  - Arguments to ping (default "-c 2")
- ping_args2 - Arguments after the host name (required for Solaris)
- ping       - Ping program to use
- host       - Host to ping
+ ping_args    - Arguments to ping (default "-c 2")
+ ping_args2   - Arguments after the host name (required for Solaris)
+ ping         - Ping program to use
+ host         - Host to ping
+ latency_max  - Drop RTT samples above this many seconds (default 5).
+                Prevents implausible values from being stored. Graph
+                axis autoscales; there is no display cap.
 
 Configuration example
 
  [multiping]
   env.host www.example.org mail.example.org
+  env.latency_max 5
 
 Configuration example for Solaris
 
@@ -93,6 +97,7 @@ export ping="${ping:-'ping'}"
 export ping_args="${ping_args:-'-c 2'}"
 export hosts="${host}"
 export ping_args2="${ping_args2}"
+export latency_max="${latency_max:-5}"
 
 
 perl -e '
@@ -100,10 +105,14 @@ perl -e '
     $ping = $ENV{'ping'};
     $ping_args = $ENV{'ping_args'};
     $ping_arg2 = $ENV{'ping_arg2'};
+    $latency_max = $ENV{'latency_max'};
     $site=1;
     foreach $host (@hosts) {
 	$_ = qx{$ping $ping_args $host $ping_args2 2>/dev/null};
-        $latency{$site} = $1 / 1000 if m@min/avg/max.*\s\d+(?:\.\d+)?/(\d+(?:\.\d+)?)/\d+(?:\.\d+)?@;
+        if (m@min/avg/max.*\s\d+(?:\.\d+)?/(\d+(?:\.\d+)?)/\d+(?:\.\d+)?@) {
+            $rtt = $1 / 1000;
+            $latency{$site} = $rtt if $rtt <= $latency_max;
+        }
         $pl{$site} = $1 if /(\d+)% packet loss/;
 	$site++;
     }
